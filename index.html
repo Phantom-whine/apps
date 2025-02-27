@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speech to Notes</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.0/cdn.min.js" defer></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <style>
+        [x-cloak] { display: none !important; }
+        body {
+            background-color: #0f0f0f;
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        }
+        .card {
+            background-color: #0f0f0f;
+            border-radius: 16px;
+            overflow: hidden;
+        }
+        .card-content {
+            padding: 20px;
+        }
+        .feature-card {
+            background-color: #2a2a2a;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+        }
+        .feature-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+        .button-primary {
+            background-color: #6c5ce7;
+            border-radius: 8px;
+            padding: 8px 16px;
+            color: white;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .button-primary:hover {
+            background-color: #5d4ce0;
+        }
+        .button-secondary {
+            background-color: #383838;
+            border-radius: 8px;
+            padding: 8px 16px;
+            color: white;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        .button-secondary:hover {
+            background-color: #444444;
+        }
+        .button-danger {
+            background-color: #e74c3c;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+        .button-danger:hover {
+            background-color: #c0392b;
+        }
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background-color: #5d4ce0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .modal-card {
+            background-color: #2a2a2a;
+            border-radius: 16px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+        }
+        .recording-pulse {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background-color: rgba(231, 76, 60, 0.2);
+            position: relative;
+        }
+        .recording-pulse::before {
+            content: '';
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background-color: #e74c3c;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7);
+            }
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 10px rgba(231, 76, 60, 0);
+            }
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(231, 76, 60, 0);
+            }
+        }
+        textarea, input {
+            background-color: #383838;
+            border: 1px solid #444444;
+            color: white;
+        }
+        textarea:focus, input:focus {
+            outline: none;
+            border-color: #6c5ce7;
+            box-shadow: 0 0 0 2px rgba(108, 92, 231, 0.3);
+        }
+        .note-card {
+            transition: all 0.3s ease;
+        }
+        .note-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+<body class="min-h-screen" x-data="app()" x-cloak>
+    <div class="container mx-auto max-w-4xl">
+        <div class="card mb-8">
+            <div class="flex justify-between items-center p-6">
+                <div class="flex items-center space-x-4">
+                    <div class="avatar">
+                        <img class="rounded-md" src="https://img.freepik.com/premium-vector/l-letter-logo-3d-modern-bold-monogram-alphabet-abstract-typeface-logotype-vector_1164395-2677.jpg?semt=ais_hybrid" alt="">
+                    </div>
+                    <h1 class="text-xl font-bold">Labi</h1>
+                </div>
+                <div class="flex space-x-2">
+                    <button @click="showWorkspaceModal = true" class="button-secondary flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                        </svg>
+                        <span class="hidden md:inline">Workspaces</span>
+                    </button>
+                    <div class="button-secondary opacity-75">
+                        <span x-text="currentWorkspace.name"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card-content">
+                <div class="mb-8 flex flex-col items-center justify-center p-8">
+                    <template x-if="!isRecording">
+                        <div class="flex flex-col items-center">
+                            <button 
+                                @click="startRecording()" 
+                                class="button-primary flex items-center justify-center w-16 h-16 rounded-full mb-4"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                                </svg>
+                            </button>
+                            <p class="text-lg mb-1">Tap to start recording</p>
+                            <p class="text-sm text-gray-400">Your notes will appear here</p>
+                        </div>
+                    </template>
+                    
+                    <template x-if="isRecording">
+                        <div class="flex flex-col items-center">
+                            <div class="recording-pulse mb-4"></div>
+                            <p class="text-lg mb-1">Recording...</p>
+                            <p class="text-sm text-gray-400 mb-4" x-text="recordingTime"></p>
+                            <button 
+                                @click="stopRecording()" 
+                                class="button-danger flex items-center justify-center px-4 py-2 rounded-lg"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+                                </svg>
+                                Stop Recording
+                            </button>
+                        </div>
+                    </template>
+                </div>
+                
+                <!-- Preview and Save -->
+                <div x-show="!isRecording && latestTranscript" class="mb-6 p-6 feature-card">
+                    <h3 class="text-lg font-semibold mb-3">Preview your recording</h3>
+                    <textarea 
+                        x-model="latestTranscript" 
+                        class="w-full p-4 rounded-lg mb-4"
+                        rows="4"
+                    ></textarea>
+                    <div class="flex justify-end">
+                        <button @click="saveNote()" class="button-primary flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                            </svg>
+                            Save Note
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Explore Features Section -->
+                <div class="mb-6" x-show="!isRecording && !latestTranscript && currentWorkspace.notes.length === 0">
+                    <h2 class="text-xl font-bold mb-4">Explore</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="feature-card p-4">
+                            <div class="flex items-start mb-2">
+                                <div class="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center mr-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="white">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold">Record & Transcribe</h3>
+                                    <p class="text-sm text-gray-400">Convert your voice to text instantly</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="feature-card p-4">
+                            <div class="flex items-start mb-2">
+                                <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center mr-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="white">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold">Organize</h3>
+                                    <p class="text-sm text-gray-400">Sort notes into different workspaces</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="feature-card p-4">
+                            <div class="flex items-start mb-2">
+                                <div class="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center mr-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="white">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold">Share</h3>
+                                    <p class="text-sm text-gray-400">Share notes with anyone instantly</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="feature-card p-4">
+                            <div class="flex items-start mb-2">
+                                <div class="w-8 h-8 rounded-full bg-red-600 flex items-center justify-center mr-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="white">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.465a5 5 0 001.42 7.072m2.828-9.9a9 9 0 010 12.728" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3 class="font-semibold">Audio Playback</h3>
+                                    <p class="text-sm text-gray-400">Listen to your notes read back to you</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Notes List -->
+        <div x-show="currentWorkspace.notes.length > 0">
+            <h2 class="text-xl font-bold mb-4 px-2">Your Notes</h2>
+            <div class="space-y-4">
+                <template x-for="(note, index) in currentWorkspace.notes" :key="index">
+                    <div class="card note-card">
+                        <div class="p-6">
+                            <div class="flex justify-between items-start">
+                                <div class="w-full">
+                                    <div class="flex justify-between items-center mb-3">
+                                        <div class="flex items-center">
+                                            <span class="text-sm text-gray-400" x-text="formatDate(note.timestamp)"></span>
+                                            <span x-show="note.isEditing" class="ml-2 text-xs px-2 py-0.5 bg-yellow-500 text-yellow-900 rounded-full">Editing</span>
+                                        </div>
+                                        <div class="flex space-x-2">
+                                            <button @click="playNote(note)" class="text-gray-400 hover:text-blue-400">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                            </button>
+                                            <button @click="toggleNoteEdit(note)" class="text-gray-400 hover:text-purple-400">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                </svg>
+                                            </button>
+                                            <button @click="shareNote(note)" class="text-gray-400 hover:text-green-400">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                                                </svg>
+                                            </button>
+                                            <button @click="deleteNote(index)" class="text-gray-400 hover:text-red-400">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <template x-if="!note.isEditing">
+                                        <p class="text-gray-300 whitespace-pre-line" x-text="note.text"></p>
+                                    </template>
+                                    <template x-if="note.isEditing">
+                                        <div class="mt-2">
+                                            <textarea 
+                                                x-model="note.text" 
+                                                class="w-full p-3 rounded-lg"
+                                                rows="4"
+                                            ></textarea>
+                                            <div class="mt-3 flex justify-end">
+                                                <button 
+                                                    @click="saveNoteEdit(note)" 
+                                                    class="button-primary"
+                                                >
+                                                    Save Changes
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+        
+        <div x-show="currentWorkspace.notes.length === 0 && !isRecording && !latestTranscript" class="flex flex-col items-center justify-center py-8">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+            </svg>
+            <p class="text-gray-400 text-lg">Start recording to create your first note</p>
+        </div>
+    </div>
+
+    <!-- Workspace Modal -->
+    <div 
+        x-show="showWorkspaceModal" 
+        class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50"
+        @click.self="showWorkspaceModal = false"
+    >
+        <div class="modal-card w-full max-w-md p-6" @click.outside="showWorkspaceModal = false">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold">Manage Workspaces</h2>
+                <button @click="showWorkspaceModal = false" class="text-gray-400 hover:text-gray-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="mb-6">
+                <div class="flex">
+                    <input 
+                        type="text" 
+                        x-model="newWorkspaceName" 
+                        class="flex-1 p-3 rounded-l-lg focus:outline-none"
+                        placeholder="New workspace name..."
+                    />
+                    <button 
+                        @click="createWorkspace()" 
+                        class="button-primary rounded-l-none rounded-r-lg"
+                    >
+                        Add
+                    </button>
+                </div>
+            </div>
+            
+            <div class="space-y-3 max-h-64 overflow-y-auto">
+                <template x-for="(workspace, index) in workspaces" :key="index">
+                    <div 
+                        class="p-3 border rounded-lg flex justify-between items-center"
+                        :class="workspace.id === currentWorkspace.id ? 'bg-indigo-900 bg-opacity-40 border-indigo-500' : 'bg-gray-800 border-gray-700'"
+                    >
+                        <div class="flex items-center">
+                            <span x-text="workspace.name"></span>
+                            <span class="ml-2 text-xs text-gray-400" x-text="`(${workspace.notes.length} notes)`"></span>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button 
+                                @click="switchWorkspace(workspace.id)" 
+                                class="button-primary text-sm py-1 px-2"
+                                x-show="workspace.id !== currentWorkspace.id"
+                            >
+                                Switch
+                            </button>
+                            <button 
+                                @click="deleteWorkspace(index)" 
+                                class="text-red-400 hover:text-red-300"
+                                x-show="workspaces.length > 1"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Note Modal -->
+    <div 
+        x-show="showShareModal" 
+        class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50"
+        @click.self="showShareModal = false"
+    >
+        <div class="modal-card w-full max-w-md p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold">Share Note</h2>
+                <button @click="showShareModal = false" class="text-gray-400 hover:text-gray-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            
+            <p class="mb-4 text-gray-300">Share this link with others to view your note:</p>
+            
+            <div class="flex mb-4">
+                <input 
+                    type="text" 
+                    x-model="shareLink" 
+                    class="flex-1 p-3 rounded-l-lg"
+                    readonly
+                />
+                <button 
+                    @click="copyShareLink()" 
+                    class="button-primary rounded-l-none rounded-r-lg"
+                >
+                    Copy
+                </button>
+            </div>
+            
+            <div x-show="linkCopied" class="text-center text-green-400 mb-4">
+                Link copied to clipboard!
+            </div>
+            
+            <div class="mt-6 text-center">
+                <button 
+                    @click="showShareModal = false" 
+                    class="button-secondary"
+                >
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        function app() {
+            return {
+                // Recording state
+                isRecording: false,
+                recognition: null,
+                recordingTime: '00:00',
+                recordingInterval: null,
+                recordingStartTime: null,
+                latestTranscript: '',
+                
+                // Workspaces
+                workspaces: [{
+                    id: 'workspace-' + Date.now(),
+                    name: 'Default Workspace',
+                    notes: []
+                }],
+                currentWorkspace: null,
+                newWorkspaceName: '',
+                showWorkspaceModal: false,
+                
+                // Note sharing
+                showShareModal: false,
+                shareLink: '',
+                linkCopied: false,
+                noteToShare: null,
+                
+                // Speech synthesis
+                speechSynthesis: window.speechSynthesis,
+                
+                init() {
+                    // Load data from localStorage
+                    this.loadData();
+                    
+                    // Set current workspace
+                    if (!this.currentWorkspace && this.workspaces.length > 0) {
+                        this.currentWorkspace = this.workspaces[0];
+                    }
+                    
+                    // Initialize speech recognition
+                    if ('webkitSpeechRecognition' in window) {
+                        this.recognition = new webkitSpeechRecognition();
+                    } else if ('SpeechRecognition' in window) {
+                        this.recognition = new SpeechRecognition();
+                    } else {
+                        alert('Speech recognition is not supported in your browser. Try Chrome or Edge.');
+                        return;
+                    }
+                    
+                    this.recognition.continuous = true;
+                    this.recognition.interimResults = true;
+                    
+                    this.recognition.onresult = (event) => {
+                        let interimTranscript = '';
+                        let finalTranscript = '';
+                        
+                        for (let i = event.resultIndex; i < event.results.length; i++) {
+                            const transcript = event.results[i][0].transcript;
+                            if (event.results[i].isFinal) {
+                                finalTranscript += transcript;
+                            } else {
+                                interimTranscript += transcript;
+                            }
+                        }
+                        
+                        this.latestTranscript = finalTranscript || interimTranscript;
+                    };
+                    
+                    this.recognition.onerror = (event) => {
+                        console.error('Speech recognition error:', event.error);
+                        if (event.error === 'not-allowed') {
+                            alert('Microphone access denied. Please allow microphone access to use this feature.');
+                            this.stopRecording();
+                        }
+                    };
+                },
+                
+                toggleRecording() {
+                    if (this.isRecording) {
+                        this.stopRecording();
+                    } else {
+                        this.startRecording();
+                    }
+                },
+                
+                startRecording() {
+                    this.latestTranscript = '';
+                    this.isRecording = true;
+                    this.recordingStartTime = Date.now();
+                    
+                    this.recognition.start();
+                    
+                    // Update recording time
+                    this.recordingInterval = setInterval(() => {
+                        const elapsedSeconds = Math.floor((Date.now() - this.recordingStartTime) / 1000);
+                        const minutes = Math.floor(elapsedSeconds / 60).toString().padStart(2, '0');
+                        const seconds = (elapsedSeconds % 60).toString().padStart(2, '0');
+                        this.recordingTime = `${minutes}:${seconds}`;
+                    }, 1000);
+                },
+                
+                stopRecording() {
+                    this.isRecording = false;
+                    this.recognition.stop();
+                    clearInterval(this.recordingInterval);
+                    this.recordingTime = '00:00';
+                },
+                
+                saveNote() {
+                    if (!this.latestTranscript.trim()) return;
+                    
+                    this.currentWorkspace.notes.unshift({
+                        id: 'note-' + Date.now(),
+                        text: this.latestTranscript.trim(),
+                        timestamp: Date.now(),
+                        isEditing: false
+                    });
+                    
+                    this.latestTranscript = '';
+                    this.saveData();
+                },
+                
+                toggleNoteEdit(note) {
+                    note.isEditing = !note.isEditing;
+                },
+                
+                saveNoteEdit(note) {
+                    note.isEditing = false;
+                    this.saveData();
+                },
+                
+                deleteNote(index) {
+                    if (confirm('Are you sure you want to delete this note?')) {
+                        this.currentWorkspace.notes.splice(index, 1);
+                        this.saveData();
+                    }
+                },
+                
+                shareNote(note) {
+                    this.noteToShare = note;
+                    // Generate a shareable link (in a real app, this would create a unique URL)
+                    const noteId = note.id;
+                    this.shareLink = `${window.location.origin}${window.location.pathname}?share=${noteId}&workspace=${this.currentWorkspace.id}`;
+                    this.showShareModal = true;
+                    this.linkCopied = false;
+                },
+                
+                copyShareLink() {
+                    navigator.clipboard.writeText(this.shareLink).then(() => {
+                        this.linkCopied = true;
+                        setTimeout(() => this.linkCopied = false, 3000);
+                    }).catch(err => {
+                        console.error('Failed to copy link: ', err);
+                        alert('Failed to copy link to clipboard');
+                    });
+                },
+                
+                playNote(note) {
+                    if (!this.speechSynthesis) {
+                        alert('Speech synthesis is not supported in your browser');
+                        return;
+                    }
+                    
+                    // Cancel any ongoing speech
+                    this.speechSynthesis.cancel();
+                    
+                    const utterance = new SpeechSynthesisUtterance(note.text);
+                    this.speechSynthesis.speak(utterance);
+                },
+                
+                createWorkspace() {
+                    if (!this.newWorkspaceName.trim()) return;
+                    
+                    this.workspaces.push({
+                        id: 'workspace-' + Date.now(),
+                        name: this.newWorkspaceName.trim(),
+                        notes: []
+                    });
+                    
+                    this.newWorkspaceName = '';
+                    this.saveData();
+                },
+                
+                switchWorkspace(workspaceId) {
+                    const workspace = this.workspaces.find(w => w.id === workspaceId);
+                    if (workspace) {
+                        this.currentWorkspace = workspace;
+                        this.showWorkspaceModal = false;
+                    }
+                },
+                
+                deleteWorkspace(index) {
+                    if (this.workspaces.length <= 1) return;
+                    
+                    const workspace = this.workspaces[index];
+                    if (confirm(`Are you sure you want to delete workspace "${workspace.name}" and all its notes?`)) {
+                        this.workspaces.splice(index, 1);
+                        
+                        // If deleting current workspace, switch to first available
+                        if (this.currentWorkspace.id === workspace.id) {
+                            this.currentWorkspace = this.workspaces[0];
+                        }
+                        
+                        this.saveData();
+                    }
+                },
+                
+                formatDate(timestamp) {
+                    return new Date(timestamp).toLocaleString();
+                },
+                
+                saveData() {
+                    try {
+                        localStorage.setItem('speechToNotesData', JSON.stringify({
+                            workspaces: this.workspaces,
+                            currentWorkspaceId: this.currentWorkspace.id
+                        }));
+                    } catch (e) {
+                        console.error('Failed to save data:', e);
+                    }
+                },
+                
+                loadData() {
+                    try {
+                        const savedData = localStorage.getItem('speechToNotesData');
+                        if (savedData) {
+                            const data = JSON.parse(savedData);
+                            this.workspaces = data.workspaces;
+                            this.currentWorkspace = this.workspaces.find(w => w.id === data.currentWorkspaceId) || this.workspaces[0];
+                        }
+                    } catch (e) {
+                        console.error('Failed to load data:', e);
+                    }
+                }
+            };
+        }
+    </script>
+</body>
+</html>
